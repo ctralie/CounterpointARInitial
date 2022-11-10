@@ -1,0 +1,23 @@
+<html>
+<body>
+
+    <div id="images"></div>
+
+    <script>
+        let markers = [0, 11, 23, 26, 69, 71, 78, 79, 154, 183];
+        let images = document.getElementById("images");
+        markers.map(function(x) {
+
+            let image = document.createElement("img");
+            image.src = "ARUCO_MIP_36h12_ID" + x + ".svg";
+            image.style.width="100%";
+            images.appendChild(image);
+            let label = document.createElement("h1");
+            label.innerHTML = x;
+            images.appendChild(label);
+        })
+
+    </script>
+
+
+</body>
