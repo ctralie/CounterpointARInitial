@@ -44,6 +44,10 @@ class ARCanvas {
         dictionary.codeList = detector.markers.map(i => detector.dictionary.codeList[i]);
     }
 
+    /**
+     * Initialize a (back facing) video stream to fill the available window
+     * as well as possible
+     */
     initializeVideo() {
         const that = this;
         const video = document.getElementById("video");
@@ -82,6 +86,11 @@ class ARCanvas {
         })
     }
 
+    /**
+     * Initialize a canvas to which to draw the video frame,
+     * as well as a position tracker object to estimate positions
+     * on canvas of the appropriate size
+     */
     initializeCanvas() {
         let canvas = document.getElementById("canvas");
         this.canvas = canvas;
@@ -91,6 +100,39 @@ class ARCanvas {
         this.posit = new POS.Posit(this.modelSize, canvas.width);
         this.lastTime = new Date();
         this.repaint();
+    }
+
+    
+    drawCorners(markers){
+        if (markers.length > 0) {
+            let ids = []
+            for (let i = 0; i < markers.length; i++) {
+                ids.push(parseInt(markers[i].id));
+            }
+            ids.sort((a, b) => a - b);
+            document.getElementById("detected").innerHTML = "Detected: " + JSON.stringify(ids);
+        }
+        else {
+            document.getElementById("detected").innerHTML = "Detected: []";
+        }
+        const context = this.context;
+        let corners, corner, i, j;
+        context.lineWidth = 3;
+        for (i = 0; i < markers.length; ++ i){
+            corners = markers[i].corners;
+            context.strokeStyle = "red";
+            context.beginPath();
+            for (j = 0; j < corners.length; ++ j){
+                corner = corners[j];
+                context.moveTo(corner.x, corner.y);
+                corner = corners[(j + 1) % corners.length];
+                context.lineTo(corner.x, corner.y);
+            }
+            context.stroke();
+            context.closePath();
+            context.strokeStyle = "green";
+            context.strokeRect(corners[0].x - 2, corners[0].y - 2, 4, 4);
+        }
     }
 
     repaint() {
@@ -106,17 +148,7 @@ class ARCanvas {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
             let markers = this.detector.detect(imageData);
-            if (markers.length > 0) {
-                let ids = []
-                for (let i = 0; i < markers.length; i++) {
-                    ids.push(parseInt(markers[i].id));
-                }
-                ids.sort((a, b) => a - b);
-                document.getElementById("detected").innerHTML = "Detected: " + JSON.stringify(ids);
-            }
-            else {
-                document.getElementById("detected").innerHTML = "Detected: []";
-            }
+            this.drawCorners(markers);
         }
         requestAnimationFrame(this.repaint.bind(this));
     }
