@@ -153,7 +153,9 @@ class ARCanvas {
      * on canvas of the appropriate size
      */
     initializeCanvas() {
-        const canvas = new OffscreenCanvas(this.video.videoWidth, this.video.videoHeight);
+        const canvas = document.createElement("canvas");
+        canvas.width = this.video.videoWidth;
+        canvas.height = this.video.videoHeight;
         this.canvas = canvas;
         this.context = canvas.getContext("2d");
         this.posit = new POS.Posit(this.modelSize, this.video.videoWidth);
@@ -164,6 +166,8 @@ class ARCanvas {
         const renderArea = this.renderArea;
         renderArea.width = this.video.videoWidth;
         renderArea.height = this.video.videoHeight;
+
+        // Step 1: Setup scene (TODO: Replace later with a scene object passed in)
         let scene = new THREE.Scene();
         this.scene = scene;
         let camera = new THREE.PerspectiveCamera(40, canvas.width / canvas.height, 1, 1000);
@@ -172,11 +176,13 @@ class ARCanvas {
         this.model = createModel();
         scene.add(this.model);
 
+        // Step 2: Setup simple orthographic scene for displaying video texture
         this.videoScene = new THREE.Scene();
         this.videoCamera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5);
         this.videoScene.add(this.videoCamera);
         this.videoScene.add(this.videoTexture);
 
+        // Step 3: Setup renderer object
         let renderer = new THREE.WebGLRenderer();
         this.renderer = renderer;
         renderer.setClearColor(0xffffff, 1);
