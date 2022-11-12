@@ -1,12 +1,48 @@
 const CANVAS_FAC = 0.8;
 
+function createModel(){
+    let object = new THREE.Object3D(),
+    geometry = new THREE.SphereGeometry(0.5, 15, 15, Math.PI),
+    texture = THREE.ImageUtils.loadTexture("js-aruco2/samples/debug-posit/textures/earth.jpg"),
+    material = new THREE.MeshBasicMaterial( {map: texture} ),
+    mesh = new THREE.Mesh(geometry, material);
+    
+    object.add(mesh);
+    
+    return object;
+  };
+
 class ARCanvas {
     /**
      * 
+     * @param {string} domName The name of the div to which to add
+     *                         this ARCanvas session
      * @param {float} modelSize Size of each marker in millimeters
      * @param {int} k Number of markers being used
      */
-    constructor(modelSize=150.0, k=10) {
+    constructor(divName, modelSize=150.0, k=10) {
+        const div = document.getElementById(divName);
+        let video = document.createElement("video");
+        video.style = "display:none;";
+        video.autoplay = true;
+        this.video = video;
+        div.appendChild(video);
+
+        let canvas = document.createElement("canvas");
+        canvas.style = "float:left;";
+        this.canvas = canvas;
+        div.appendChild(canvas);
+
+        let renderArea = document.createElement("div");
+        renderArea.style = "float:left;";
+        this.renderArea = renderArea;
+        div.appendChild(renderArea);
+
+        let debugArea = document.createElement("p");
+        this.debugArea = debugArea;
+        div.appendChild(debugArea);
+
+
         this.modelSize = modelSize;
         this.setupMarkers(k);
         window.onload = this.initializeVideo.bind(this);
@@ -50,8 +86,7 @@ class ARCanvas {
      */
     initializeVideo() {
         const that = this;
-        const video = document.getElementById("video");
-        this.video = video;
+        const video = this.video;
         if (navigator.mediaDevices === undefined) {
             navigator.mediaDevices = {};
         }
@@ -80,6 +115,8 @@ class ARCanvas {
             }
             video.onloadeddata = function() {
                 that.initializeCanvas();
+                that.setupScene();
+                that.repaint();
             }
         }).catch(function(err) {
             console.log(err);
@@ -92,14 +129,26 @@ class ARCanvas {
      * on canvas of the appropriate size
      */
     initializeCanvas() {
-        let canvas = document.getElementById("canvas");
-        this.canvas = canvas;
+        const canvas = this.canvas;
         canvas.width = this.video.videoWidth;
         canvas.height = this.video.videoHeight;
         this.context = canvas.getContext("2d");
         this.posit = new POS.Posit(this.modelSize, canvas.width);
         this.lastTime = new Date();
-        this.repaint();
+    }
+
+    setupScene() {
+        let scene = new THREE.Scene();
+        this.scene = scene;
+        let camera = new THREE.PerspectiveCamera(40, canvas.width / canvas.height, 1, 1000);
+        this.camera = camera;
+        scene.add(camera);
+        scene.add(createModel());
+
+        let renderer = new THREE.WebGLRenderer();
+        this.renderer = renderer;
+        renderer.setClearColor(0xffffff, 1);
+        renderer.setSize(this.canvas.width, this.canvas.height);
     }
 
     /**
@@ -107,17 +156,16 @@ class ARCanvas {
      * @param {list} markers List of markers
      */
     printMarkers(markers) {
+        this.debugArea.innerHTML += "<p>Detected: ";
         if (markers.length > 0) {
             let ids = []
             for (let i = 0; i < markers.length; i++) {
                 ids.push(parseInt(markers[i].id));
             }
             ids.sort((a, b) => a - b);
-            document.getElementById("detected").innerHTML = "Detected: " + JSON.stringify(ids);
+            this.debugArea.innerHTML += JSON.stringify(ids);
         }
-        else {
-            document.getElementById("detected").innerHTML = "Detected: []";
-        }
+        this.debugArea.innerHTML += "</p>";
     }
 
     /**
@@ -171,7 +219,8 @@ class ARCanvas {
         let thisTime = new Date();
         let elapsed = thisTime - this.lastTime;
         this.lastTime = thisTime;
-        document.getElementById("fps").innerHTML = Math.round(1000/elapsed) + " fps";
+        this.debugArea.innerHTML = "";
+        this.debugArea.innerHTML += "<p>" + Math.round(1000/elapsed) + " fps</p>";
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
