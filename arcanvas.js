@@ -102,8 +102,11 @@ class ARCanvas {
         this.repaint();
     }
 
-    
-    drawCorners(markers){
+    /**
+     * Output the IDs of the markers to the canvas for debugging
+     * @param {list} markers List of markers
+     */
+    printMarkers(markers) {
         if (markers.length > 0) {
             let ids = []
             for (let i = 0; i < markers.length; i++) {
@@ -115,6 +118,14 @@ class ARCanvas {
         else {
             document.getElementById("detected").innerHTML = "Detected: []";
         }
+    }
+
+    /**
+     * Draw the corners of all fo the markers to the canvas for
+     * debugging
+     * @param {list} markers List of markers
+     */
+    drawCorners(markers){
         const context = this.context;
         let corners, corner, i, j;
         context.lineWidth = 3;
@@ -135,6 +146,24 @@ class ARCanvas {
         }
     }
 
+    /**
+     * Infer the pose from the detected markers
+     * @param {list} markers List of markers
+     */
+    getPose(markers) {
+        const canvas = this.canvas;
+        for (let i = 0; i < markers.length; i++) {
+            let corners = markers[i].corners;
+            for (let k = 0; k < corners.length; k++) {
+                let corner = corners[k];
+                corner.x = corner.x - canvas.width/2;
+                corner.y = canvas.height/2 - corner.y;
+            }
+            let pose = this.posit.pose(corners);
+            console.log(pose.bestTranslation);
+        }
+    }
+
     repaint() {
         const canvas = this.canvas;
         const video = this.video;
@@ -142,13 +171,14 @@ class ARCanvas {
         let thisTime = new Date();
         let elapsed = thisTime - this.lastTime;
         this.lastTime = thisTime;
-        console.log(elapsed);
         document.getElementById("fps").innerHTML = Math.round(1000/elapsed) + " fps";
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
             let markers = this.detector.detect(imageData);
+            this.printMarkers(markers);
             this.drawCorners(markers);
+            this.getPose(markers);
         }
         requestAnimationFrame(this.repaint.bind(this));
     }
