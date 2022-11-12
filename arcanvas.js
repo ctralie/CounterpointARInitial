@@ -6,11 +6,39 @@ function createModel(){
     texture = THREE.ImageUtils.loadTexture("js-aruco2/samples/debug-posit/textures/earth.jpg"),
     material = new THREE.MeshBasicMaterial( {map: texture} ),
     mesh = new THREE.Mesh(geometry, material);
-    
     object.add(mesh);
-    
     return object;
-  };
+}
+
+/**
+ * Create a Three.js texture that holds a video stream
+ * @param {object} video HTML5 Video object
+ * @returns Three.js object with a video texture
+ */
+function createVideoTexture(video){
+    let texture = new THREE.Texture(video);
+    let object = new THREE.Object3D();
+    let geometry = new THREE.PlaneGeometry(1.0, 1.0, 0.0);
+    let material = new THREE.MeshBasicMaterial({map: texture, depthTest: false, depthWrite: false});
+    let mesh = new THREE.Mesh(geometry, material);
+    object.position.z = -1;
+    object.add(mesh);
+    return object;
+}
+
+function updateObject(object, scale, rotation, translation){
+    object.scale.x = scale;
+    object.scale.y = scale;
+    object.scale.z = scale;
+
+    object.rotation.x = -Math.asin(-rotation[1][2]);
+    object.rotation.y = -Math.atan2(rotation[0][2], rotation[2][2]);
+    object.rotation.z = Math.atan2(rotation[1][0], rotation[1][1]);
+
+    object.position.x = translation[0];
+    object.position.y = translation[1];
+    object.position.z = -translation[2];
+}
 
 class ARCanvas {
     /**
@@ -27,11 +55,6 @@ class ARCanvas {
         video.autoplay = true;
         this.video = video;
         div.appendChild(video);
-
-        let canvas = document.createElement("canvas");
-        canvas.style = "float:left;";
-        this.canvas = canvas;
-        div.appendChild(canvas);
 
         let renderArea = document.createElement("div");
         renderArea.style = "float:left;";
@@ -114,6 +137,7 @@ class ARCanvas {
                 video.src = window.URL.createObjectURL(stream);
             }
             video.onloadeddata = function() {
+                that.videoTexture = createVideoTexture(video);
                 that.initializeCanvas();
                 that.setupScene();
                 that.repaint();
@@ -129,26 +153,35 @@ class ARCanvas {
      * on canvas of the appropriate size
      */
     initializeCanvas() {
-        const canvas = this.canvas;
-        canvas.width = this.video.videoWidth;
-        canvas.height = this.video.videoHeight;
+        const canvas = new OffscreenCanvas(this.video.videoWidth, this.video.videoHeight);
+        this.canvas = canvas;
         this.context = canvas.getContext("2d");
-        this.posit = new POS.Posit(this.modelSize, canvas.width);
+        this.posit = new POS.Posit(this.modelSize, this.video.videoWidth);
         this.lastTime = new Date();
     }
 
     setupScene() {
+        const renderArea = this.renderArea;
+        renderArea.width = this.video.videoWidth;
+        renderArea.height = this.video.videoHeight;
         let scene = new THREE.Scene();
         this.scene = scene;
         let camera = new THREE.PerspectiveCamera(40, canvas.width / canvas.height, 1, 1000);
         this.camera = camera;
         scene.add(camera);
-        scene.add(createModel());
+        this.model = createModel();
+        scene.add(this.model);
+
+        this.videoScene = new THREE.Scene();
+        this.videoCamera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5);
+        this.videoScene.add(this.videoCamera);
+        this.videoScene.add(this.videoTexture);
 
         let renderer = new THREE.WebGLRenderer();
         this.renderer = renderer;
         renderer.setClearColor(0xffffff, 1);
         renderer.setSize(this.canvas.width, this.canvas.height);
+        renderArea.appendChild(renderer.domElement);
     }
 
     /**
@@ -200,6 +233,7 @@ class ARCanvas {
      */
     getPose(markers) {
         const canvas = this.canvas;
+        let pose = null;
         for (let i = 0; i < markers.length; i++) {
             let corners = markers[i].corners;
             for (let k = 0; k < corners.length; k++) {
@@ -207,15 +241,16 @@ class ARCanvas {
                 corner.x = corner.x - canvas.width/2;
                 corner.y = canvas.height/2 - corner.y;
             }
-            let pose = this.posit.pose(corners);
-            console.log(pose.bestTranslation);
+            pose = this.posit.pose(corners);
         }
+        return pose;
     }
 
     repaint() {
         const canvas = this.canvas;
         const video = this.video;
         const context = this.context;
+        const renderer = this.renderer;
         let thisTime = new Date();
         let elapsed = thisTime - this.lastTime;
         this.lastTime = thisTime;
@@ -227,7 +262,15 @@ class ARCanvas {
             let markers = this.detector.detect(imageData);
             this.printMarkers(markers);
             this.drawCorners(markers);
-            this.getPose(markers);
+            let pose = this.getPose(markers);
+            if (!(pose === null)) {
+                updateObject(this.model, this.modelSize, pose.bestRotation, pose.bestTranslation);
+            }
+            this.videoTexture.children[0].material.map.needsUpdate = true;
+            renderer.autoClear = false;
+            renderer.clear();
+            renderer.render(this.scene, this.camera);
+            renderer.render(this.videoScene, this.videoCamera);
         }
         requestAnimationFrame(this.repaint.bind(this));
     }
