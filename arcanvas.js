@@ -170,7 +170,7 @@ class ARCanvas {
         // Step 1: Setup scene (TODO: Replace later with a scene object passed in)
         let scene = new THREE.Scene();
         this.scene = scene;
-        let camera = new THREE.PerspectiveCamera(40, canvas.width / canvas.height, 1, 1000);
+        let camera = new THREE.PerspectiveCamera(40, renderArea.width / renderArea.height, 1, 1000);
         this.camera = camera;
         scene.add(camera);
         this.model = createModel();
@@ -275,8 +275,8 @@ class ARCanvas {
             this.videoTexture.children[0].material.map.needsUpdate = true;
             renderer.autoClear = false;
             renderer.clear();
-            renderer.render(this.scene, this.camera);
             renderer.render(this.videoScene, this.videoCamera);
+            renderer.render(this.scene, this.camera);
         }
         requestAnimationFrame(this.repaint.bind(this));
     }
